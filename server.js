@@ -1,7 +1,6 @@
 import app from "./src/app.js";
 import dotenv from "dotenv";
 import swaggerUi from "swagger-ui-express";
-import swaggerJsdoc from "swagger-jsdoc";
 import logger from "./src/utils/logger.js";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -13,29 +12,10 @@ dotenv.config({ path: path.resolve(__dirname, "./.env") });
 
 const PORT = process.env.PORT || 5000;
 
-// Cấu hình Swagger API Documentation
-const swaggerOptions = {
-  definition: {
-    openapi: "3.0.0",
-    info: {
-      title: "Music Market API Documentation",
-      version: "1.0.0",
-      description: "Hệ thống tài liệu hướng dẫn sử dụng các API Music Market",
-    },
-    servers: [
-      {
-        url: `http://localhost:${PORT}/api/v1`,
-        description: "Local Development Server",
-      },
-    ],
-  },
-  apis: ["./src/routes/*.js"],
-};
-
-const swaggerDocs = swaggerJsdoc(swaggerOptions);
+import swaggerSpec from "./src/config/swagger.js";
 
 // Mount tài liệu Swagger trên đường dẫn /api-docs
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.listen(PORT, () => {
   logger.info(`===============================================`);
