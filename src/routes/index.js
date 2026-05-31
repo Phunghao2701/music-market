@@ -7,6 +7,7 @@ import tagRouter from './tag.route.js';
 import licensePlanRouter from './licensePlan.route.js';
 import trackRouter from './track.route.js';
 import adminRouter from './admin.route.js';
+import inquiryRouter from './inquiry.route.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
 const router = express.Router();
@@ -23,6 +24,7 @@ router.use('/moods', moodRouter);
 router.use('/tags', tagRouter);
 router.use('/license-plans', licensePlanRouter);
 router.use('/tracks', trackRouter);
+router.use('/inquiries', inquiryRouter);
 
 // Mount admin routers
 router.use('/admin', adminRouter);

@@ -37,6 +37,31 @@ import {
   patchLicensePlanStatus,
   deleteLicensePlan
 } from '../controllers/licensePlan.controller.js';
+import {
+  getLicenseOptions,
+  postLicenseOption,
+  putLicenseOption,
+  patchLicenseOptionAvailability,
+  deleteLicenseOption
+} from '../controllers/trackLicenseOption.controller.js';
+import {
+  getInquiriesAdmin,
+  getInquiryDetailAdmin,
+  patchInquiryStatus,
+  patchInquiryNote
+} from '../controllers/inquiry.controller.js';
+import {
+  getPurchasesAdmin,
+  getPurchaseDetailAdmin,
+  postPurchaseAdmin,
+  patchPurchaseStatus,
+  patchPurchaseDelivery
+} from '../controllers/purchase.controller.js';
+import {
+  getSummary,
+  getTopTracks,
+  getRevenue
+} from '../controllers/dashboard.controller.js';
 
 const router = express.Router();
 
@@ -104,5 +129,38 @@ router.post('/license-plans', verifyToken, allowedAdminOnly, postLicensePlan);
 router.put('/license-plans/:licenseId', verifyToken, allowedAdminOnly, putLicensePlan);
 router.patch('/license-plans/:licenseId/status', verifyToken, allowedAdminOnly, patchLicensePlanStatus);
 router.delete('/license-plans/:licenseId', verifyToken, allowedAdminOnly, deleteLicensePlan);
+
+// ==========================================
+// TRACK LICENSE OPTIONS CRUD (Admin/Producer)
+// ==========================================
+router.get('/tracks/:trackId/license-options', verifyToken, allowedManagers, getLicenseOptions);
+router.post('/tracks/:trackId/license-options', verifyToken, allowedManagers, postLicenseOption);
+router.put('/track-license-options/:licenseOptionId', verifyToken, allowedManagers, putLicenseOption);
+router.patch('/track-license-options/:licenseOptionId/availability', verifyToken, allowedManagers, patchLicenseOptionAvailability);
+router.delete('/track-license-options/:licenseOptionId', verifyToken, allowedManagers, deleteLicenseOption);
+
+// ==========================================
+// ADMIN INQUIRIES MANAGEMENT (Admin Only)
+// ==========================================
+router.get('/inquiries', verifyToken, allowedAdminOnly, getInquiriesAdmin);
+router.get('/inquiries/:purchaseInquiryId', verifyToken, allowedAdminOnly, getInquiryDetailAdmin);
+router.patch('/inquiries/:purchaseInquiryId/status', verifyToken, allowedAdminOnly, patchInquiryStatus);
+router.patch('/inquiries/:purchaseInquiryId/note', verifyToken, allowedAdminOnly, patchInquiryNote);
+
+// ==========================================
+// ADMIN PURCHASES MANAGEMENT (Admin Only)
+// ==========================================
+router.get('/purchases', verifyToken, allowedAdminOnly, getPurchasesAdmin);
+router.post('/purchases', verifyToken, allowedAdminOnly, postPurchaseAdmin);
+router.get('/purchases/:purchaseId', verifyToken, allowedAdminOnly, getPurchaseDetailAdmin);
+router.patch('/purchases/:purchaseId/status', verifyToken, allowedAdminOnly, patchPurchaseStatus);
+router.patch('/purchases/:purchaseId/delivery', verifyToken, allowedAdminOnly, patchPurchaseDelivery);
+
+// ==========================================
+// ADMIN DASHBOARD (Admin Only)
+// ==========================================
+router.get('/dashboard/summary', verifyToken, allowedAdminOnly, getSummary);
+router.get('/dashboard/top-tracks', verifyToken, allowedAdminOnly, getTopTracks);
+router.get('/dashboard/revenue', verifyToken, allowedAdminOnly, getRevenue);
 
 export default router;
