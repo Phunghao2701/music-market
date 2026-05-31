@@ -57,6 +57,11 @@ import {
   patchPurchaseStatus,
   patchPurchaseDelivery
 } from '../controllers/purchase.controller.js';
+import {
+  getSummary,
+  getTopTracks,
+  getRevenue
+} from '../controllers/dashboard.controller.js';
 
 const router = express.Router();
 
@@ -150,5 +155,12 @@ router.post('/purchases', verifyToken, allowedAdminOnly, postPurchaseAdmin);
 router.get('/purchases/:purchaseId', verifyToken, allowedAdminOnly, getPurchaseDetailAdmin);
 router.patch('/purchases/:purchaseId/status', verifyToken, allowedAdminOnly, patchPurchaseStatus);
 router.patch('/purchases/:purchaseId/delivery', verifyToken, allowedAdminOnly, patchPurchaseDelivery);
+
+// ==========================================
+// ADMIN DASHBOARD (Admin Only)
+// ==========================================
+router.get('/dashboard/summary', verifyToken, allowedAdminOnly, getSummary);
+router.get('/dashboard/top-tracks', verifyToken, allowedAdminOnly, getTopTracks);
+router.get('/dashboard/revenue', verifyToken, allowedAdminOnly, getRevenue);
 
 export default router;
