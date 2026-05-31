@@ -24,6 +24,12 @@ import {
   putTrackMoods,
   putTrackTags
 } from '../controllers/catalog.controller.js';
+import {
+  getAudioFiles,
+  postAudioFile,
+  putAudioFile,
+  deleteAudioFile
+} from '../controllers/audioFile.controller.js';
 
 const router = express.Router();
 
@@ -74,5 +80,13 @@ router.delete('/tags/:tagId', verifyToken, allowedAdminOnly, deleteTag);
 router.put('/tracks/:trackId/genres', verifyToken, allowedManagers, putTrackGenres);
 router.put('/tracks/:trackId/moods', verifyToken, allowedManagers, putTrackMoods);
 router.put('/tracks/:trackId/tags', verifyToken, allowedManagers, putTrackTags);
+
+// ==========================================
+// TRACK AUDIO FILES CRUD (Admin/Producer)
+// ==========================================
+router.get('/tracks/:trackId/audio-files', verifyToken, allowedManagers, getAudioFiles);
+router.post('/tracks/:trackId/audio-files', verifyToken, allowedManagers, postAudioFile);
+router.put('/audio-files/:audioId', verifyToken, allowedManagers, putAudioFile);
+router.delete('/audio-files/:audioId', verifyToken, allowedManagers, deleteAudioFile);
 
 export default router;
