@@ -5,6 +5,7 @@ import genreRouter from './genre.route.js';
 import moodRouter from './mood.route.js';
 import tagRouter from './tag.route.js';
 import licensePlanRouter from './licensePlan.route.js';
+import trackRouter from './track.route.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.use('/genres', genreRouter);
 router.use('/moods', moodRouter);
 router.use('/tags', tagRouter);
 router.use('/license-plans', licensePlanRouter);
+router.use('/tracks', trackRouter);
 
 // Fallback for undefined routes
 router.use('*', (req, res, next) => {
