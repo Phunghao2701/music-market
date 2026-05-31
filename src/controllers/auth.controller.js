@@ -1,0 +1,82 @@
+import * as authService from '../services/auth.service.js';
+import logger from '../utils/logger.js';
+
+/**
+ * Validate email format
+ */
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+/**
+ * Handle user login POST request
+ */
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email không được để trống'
+      });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email không đúng định dạng'
+      });
+    }
+
+    if (!password || !password.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mật khẩu không được để trống'
+      });
+    }
+
+    const data = await authService.loginWithEmailPassword({ email, password });
+
+    logger.info(`[Auth]: Đăng nhập thành công cho tài khoản: ${email}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đăng nhập thành công',
+      data
+    });
+  } catch (error) {
+    if (!error.statusCode || error.statusCode === 500) {
+      logger.error('Lỗi hệ thống trong controller đăng nhập:', error);
+    }
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Có lỗi xảy ra ở server'
+    });
+  }
+};
+
+/**
+ * Fetch authenticated user info GET request (requires verifyToken middleware)
+ */
+export const getMe = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const user = await authService.getUserById(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Lấy thông tin người dùng thành công',
+      data: { user }
+    });
+  } catch (error) {
+    if (!error.statusCode || error.statusCode === 500) {
+      logger.error('Lỗi hệ thống khi lấy thông tin người dùng hiện tại:', error);
+    }
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Có lỗi xảy ra ở server'
+    });
+  }
+};
