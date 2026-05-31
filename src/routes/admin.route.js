@@ -37,6 +37,13 @@ import {
   patchLicensePlanStatus,
   deleteLicensePlan
 } from '../controllers/licensePlan.controller.js';
+import {
+  getLicenseOptions,
+  postLicenseOption,
+  putLicenseOption,
+  patchLicenseOptionAvailability,
+  deleteLicenseOption
+} from '../controllers/trackLicenseOption.controller.js';
 
 const router = express.Router();
 
@@ -104,5 +111,14 @@ router.post('/license-plans', verifyToken, allowedAdminOnly, postLicensePlan);
 router.put('/license-plans/:licenseId', verifyToken, allowedAdminOnly, putLicensePlan);
 router.patch('/license-plans/:licenseId/status', verifyToken, allowedAdminOnly, patchLicensePlanStatus);
 router.delete('/license-plans/:licenseId', verifyToken, allowedAdminOnly, deleteLicensePlan);
+
+// ==========================================
+// TRACK LICENSE OPTIONS CRUD (Admin/Producer)
+// ==========================================
+router.get('/tracks/:trackId/license-options', verifyToken, allowedManagers, getLicenseOptions);
+router.post('/tracks/:trackId/license-options', verifyToken, allowedManagers, postLicenseOption);
+router.put('/track-license-options/:licenseOptionId', verifyToken, allowedManagers, putLicenseOption);
+router.patch('/track-license-options/:licenseOptionId/availability', verifyToken, allowedManagers, patchLicenseOptionAvailability);
+router.delete('/track-license-options/:licenseOptionId', verifyToken, allowedManagers, deleteLicenseOption);
 
 export default router;
