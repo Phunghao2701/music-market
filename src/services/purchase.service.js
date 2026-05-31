@@ -10,6 +10,34 @@ const VALID_PURCHASE_STATUSES = new Set([
 ]);
 
 /**
+ * Check if a track is available for an exclusive purchase.
+ * Returns true if available (no paid/delivered/completed exclusive purchases exist), false otherwise.
+ */
+export const checkExclusiveAvailability = async (trackId, excludePurchaseId = null) => {
+  const parsedTrackId = parseInt(trackId, 10);
+  if (isNaN(parsedTrackId)) {
+    return false;
+  }
+
+  let sql = `
+    SELECT COUNT(*) FROM purchases 
+    WHERE track_id = $1 AND is_exclusive = TRUE AND status IN ('paid', 'delivered', 'completed')
+  `;
+  const params = [parsedTrackId];
+
+  if (excludePurchaseId !== null) {
+    const parsedExcludeId = parseInt(excludePurchaseId, 10);
+    if (!isNaN(parsedExcludeId)) {
+      params.push(parsedExcludeId);
+      sql += ` AND purchase_id != $2`;
+    }
+  }
+
+  const res = await pool.query(sql, params);
+  return parseInt(res.rows[0].count, 10) === 0;
+};
+
+/**
  * Admin: List all purchases with customer and track information
  */
 export const listPurchasesAdmin = async () => {
@@ -195,78 +223,98 @@ export const createPurchaseAdmin = async (payload) => {
     return { invalidPayload: true, message: `Trạng thái không hợp lệ. Các giá trị chấp nhận: ${[...VALID_PURCHASE_STATUSES].join(', ')}` };
   }
 
-  // 4. Check Exclusive Constraint
-  if (resolvedIsExclusive && ['paid', 'delivered', 'completed'].includes(status)) {
-    const dupCheck = await pool.query(
-      `SELECT COUNT(*) FROM purchases 
-       WHERE track_id = $1 AND is_exclusive = TRUE AND status IN ('paid', 'delivered', 'completed')`,
-      [parsedTrackId]
-    );
-    if (parseInt(dupCheck.rows[0].count, 10) > 0) {
-      return { invalidPayload: true, message: 'Bài nhạc này đã có giao dịch độc quyền thành công.' };
+  // Use a transaction client to perform exclusive check, insert purchase, and update track status
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 4. Check Exclusive Constraint
+    if (resolvedIsExclusive && ['paid', 'delivered', 'completed'].includes(status)) {
+      const isAvailable = await checkExclusiveAvailability(parsedTrackId);
+      if (!isAvailable) {
+        await client.query('ROLLBACK');
+        return { invalidPayload: true, message: 'Bài nhạc này đã có giao dịch độc quyền thành công.' };
+      }
     }
-  }
 
-  // 5. Build Timestamps based on status
-  let paid_at = null;
-  let delivered_at = null;
-  let completed_at = null;
+    // 5. Build Timestamps based on status
+    let paid_at = null;
+    let delivered_at = null;
+    let completed_at = null;
 
-  if (status === 'paid') {
-    paid_at = new Date();
-  } else if (status === 'delivered') {
-    paid_at = new Date();
-    delivered_at = new Date();
-  } else if (status === 'completed') {
-    paid_at = new Date();
-    delivered_at = new Date();
-    completed_at = new Date();
-  }
+    if (status === 'paid') {
+      paid_at = new Date();
+    } else if (status === 'delivered') {
+      paid_at = new Date();
+      delivered_at = new Date();
+    } else if (status === 'completed') {
+      paid_at = new Date();
+      delivered_at = new Date();
+      completed_at = new Date();
+    }
 
-  // 6. Execute Insert
-  const insertSql = `
-    INSERT INTO purchases (
-      inquiry_id,
-      customer_id,
-      track_id,
-      license_option_id,
-      license_name,
-      is_exclusive,
-      final_price,
+    // 6. Execute Insert
+    const insertSql = `
+      INSERT INTO purchases (
+        inquiry_id,
+        customer_id,
+        track_id,
+        license_option_id,
+        license_name,
+        is_exclusive,
+        final_price,
+        currency,
+        status,
+        contract_url,
+        delivered_file_url,
+        paid_at,
+        delivered_at,
+        completed_at,
+        note
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      RETURNING *
+    `;
+    const insertParams = [
+      inquiry_id ? parseInt(inquiry_id, 10) : null,
+      resolvedCustomerId,
+      parsedTrackId,
+      license_option_id ? parseInt(license_option_id, 10) : null,
+      resolvedLicenseName,
+      resolvedIsExclusive,
+      resolvedFinalPrice,
       currency,
       status,
-      contract_url,
-      delivered_file_url,
+      contract_url || null,
+      delivered_file_url || null,
       paid_at,
       delivered_at,
       completed_at,
-      note
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-    RETURNING *
-  `;
-  const insertParams = [
-    inquiry_id ? parseInt(inquiry_id, 10) : null,
-    resolvedCustomerId,
-    parsedTrackId,
-    license_option_id ? parseInt(license_option_id, 10) : null,
-    resolvedLicenseName,
-    resolvedIsExclusive,
-    resolvedFinalPrice,
-    currency,
-    status,
-    contract_url || null,
-    delivered_file_url || null,
-    paid_at,
-    delivered_at,
-    completed_at,
-    note || null
-  ];
+      note || null
+    ];
 
-  const result = await pool.query(insertSql, insertParams);
-  return {
-    success: true,
-    purchase: result.rows[0]
-  };
+    const insertRes = await client.query(insertSql, insertParams);
+    const purchase = insertRes.rows[0];
+
+    // 7. Update Track Status if purchase is completed
+    if (status === 'completed') {
+      const newTrackStatus = resolvedIsExclusive ? 'sold_exclusive' : 'sold_non_exclusive';
+      await client.query(
+        'UPDATE tracks SET status = $1, updated_at = NOW() WHERE track_id = $2',
+        [newTrackStatus, parsedTrackId]
+      );
+    }
+
+    await client.query('COMMIT');
+    return {
+      success: true,
+      purchase
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 /**
@@ -282,57 +330,77 @@ export const updatePurchaseStatus = async (purchaseId, status) => {
     return { invalidPayload: true, message: `Trạng thái không hợp lệ. Các giá trị chấp nhận: ${[...VALID_PURCHASE_STATUSES].join(', ')}` };
   }
 
-  // Get current purchase details
-  const currentRes = await pool.query(
-    'SELECT track_id, is_exclusive, paid_at, delivered_at, completed_at FROM purchases WHERE purchase_id = $1',
-    [parsedId]
-  );
-  if (currentRes.rows.length === 0) {
-    return { notFound: true };
-  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  const purchase = currentRes.rows[0];
-
-  // Enforce exclusivity rule
-  if (purchase.is_exclusive && ['paid', 'delivered', 'completed'].includes(status)) {
-    const dupCheck = await pool.query(
-      `SELECT COUNT(*) FROM purchases 
-       WHERE track_id = $1 AND is_exclusive = TRUE AND status IN ('paid', 'delivered', 'completed') AND purchase_id != $2`,
-      [purchase.track_id, parsedId]
+    // Get current purchase details
+    const currentRes = await client.query(
+      'SELECT track_id, is_exclusive, paid_at, delivered_at, completed_at FROM purchases WHERE purchase_id = $1',
+      [parsedId]
     );
-    if (parseInt(dupCheck.rows[0].count, 10) > 0) {
-      return { invalidPayload: true, message: 'Bài nhạc này đã có giao dịch độc quyền thành công.' };
+    if (currentRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return { notFound: true };
     }
+
+    const purchase = currentRes.rows[0];
+
+    // Enforce exclusivity rule
+    if (purchase.is_exclusive && ['paid', 'delivered', 'completed'].includes(status)) {
+      const isAvailable = await checkExclusiveAvailability(purchase.track_id, parsedId);
+      if (!isAvailable) {
+        await client.query('ROLLBACK');
+        return { invalidPayload: true, message: 'Bài nhạc này đã có giao dịch độc quyền thành công.' };
+      }
+    }
+
+    // Timestamps calculation
+    let paid_at = purchase.paid_at;
+    let delivered_at = purchase.delivered_at;
+    let completed_at = purchase.completed_at;
+
+    const now = new Date();
+    if (status === 'paid') {
+      if (!paid_at) paid_at = now;
+    } else if (status === 'delivered') {
+      if (!paid_at) paid_at = now;
+      if (!delivered_at) delivered_at = now;
+    } else if (status === 'completed') {
+      if (!paid_at) paid_at = now;
+      if (!delivered_at) delivered_at = now;
+      if (!completed_at) completed_at = now;
+    }
+
+    const updateSql = `
+      UPDATE purchases 
+      SET status = $1, paid_at = $2, delivered_at = $3, completed_at = $4, updated_at = NOW()
+      WHERE purchase_id = $5
+      RETURNING *
+    `;
+    const updateRes = await client.query(updateSql, [status, paid_at, delivered_at, completed_at, parsedId]);
+    const updatedPurchase = updateRes.rows[0];
+
+    // Update Track Status if purchase transitions to completed
+    if (status === 'completed') {
+      const newTrackStatus = purchase.is_exclusive ? 'sold_exclusive' : 'sold_non_exclusive';
+      await client.query(
+        'UPDATE tracks SET status = $1, updated_at = NOW() WHERE track_id = $2',
+        [newTrackStatus, purchase.track_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    return {
+      success: true,
+      purchase: updatedPurchase
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-
-  // Timestamps calculation
-  let paid_at = purchase.paid_at;
-  let delivered_at = purchase.delivered_at;
-  let completed_at = purchase.completed_at;
-
-  const now = new Date();
-  if (status === 'paid') {
-    if (!paid_at) paid_at = now;
-  } else if (status === 'delivered') {
-    if (!paid_at) paid_at = now;
-    if (!delivered_at) delivered_at = now;
-  } else if (status === 'completed') {
-    if (!paid_at) paid_at = now;
-    if (!delivered_at) delivered_at = now;
-    if (!completed_at) completed_at = now;
-  }
-
-  const updateSql = `
-    UPDATE purchases 
-    SET status = $1, paid_at = $2, delivered_at = $3, completed_at = $4, updated_at = NOW()
-    WHERE purchase_id = $5
-    RETURNING *
-  `;
-  const result = await pool.query(updateSql, [status, paid_at, delivered_at, completed_at, parsedId]);
-  return {
-    success: true,
-    purchase: result.rows[0]
-  };
 };
 
 /**
