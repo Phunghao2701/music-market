@@ -44,6 +44,12 @@ import {
   patchLicenseOptionAvailability,
   deleteLicenseOption
 } from '../controllers/trackLicenseOption.controller.js';
+import {
+  getInquiriesAdmin,
+  getInquiryDetailAdmin,
+  patchInquiryStatus,
+  patchInquiryNote
+} from '../controllers/inquiry.controller.js';
 
 const router = express.Router();
 
@@ -120,5 +126,13 @@ router.post('/tracks/:trackId/license-options', verifyToken, allowedManagers, po
 router.put('/track-license-options/:licenseOptionId', verifyToken, allowedManagers, putLicenseOption);
 router.patch('/track-license-options/:licenseOptionId/availability', verifyToken, allowedManagers, patchLicenseOptionAvailability);
 router.delete('/track-license-options/:licenseOptionId', verifyToken, allowedManagers, deleteLicenseOption);
+
+// ==========================================
+// ADMIN INQUIRIES MANAGEMENT (Admin Only)
+// ==========================================
+router.get('/inquiries', verifyToken, allowedAdminOnly, getInquiriesAdmin);
+router.get('/inquiries/:purchaseInquiryId', verifyToken, allowedAdminOnly, getInquiryDetailAdmin);
+router.patch('/inquiries/:purchaseInquiryId/status', verifyToken, allowedAdminOnly, patchInquiryStatus);
+router.patch('/inquiries/:purchaseInquiryId/note', verifyToken, allowedAdminOnly, patchInquiryNote);
 
 export default router;

@@ -256,3 +256,194 @@ export const getInquiryStatus = async (purchaseInquiryId) => {
     }
   };
 };
+
+const VALID_INQUIRY_STATUSES = new Set([
+  'new',
+  'contacted',
+  'negotiating',
+  'waiting_payment',
+  'paid',
+  'delivered',
+  'closed',
+  'rejected'
+]);
+
+/**
+ * Admin: List purchase inquiries with filtering and search capabilities
+ */
+export const listInquiriesAdmin = async (filters = {}) => {
+  const { status, search } = filters;
+  const conditions = [];
+  const params = [];
+
+  if (status) {
+    params.push(status.trim());
+    conditions.push(`i.status = $${params.length}`);
+  }
+
+  if (search) {
+    params.push(`%${search.trim()}%`);
+    conditions.push(`(c.customer_name ILIKE $${params.length} OR c.customer_email ILIKE $${params.length} OR c.customer_phone ILIKE $${params.length})`);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const sql = `
+    SELECT 
+      i.purchase_inquiry_id,
+      i.customer_id,
+      i.preferred_license_option_id,
+      i.usage_purpose,
+      i.usage_description,
+      i.budget,
+      i.currency,
+      i.message,
+      i.status,
+      i.admin_note,
+      i.created_at,
+      i.updated_at,
+      c.customer_name,
+      c.customer_email,
+      c.customer_phone,
+      c.company_name,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'track_id', t.track_id,
+            'title', t.title,
+            'slug', t.slug,
+            'cover_image_url', t.cover_image_url
+          )
+        ) FILTER (WHERE t.track_id IS NOT NULL),
+        '[]'
+      ) AS tracks
+    FROM purchase_inquiries i
+    JOIN customers c ON i.customer_id = c.customer_id
+    LEFT JOIN inquiry_tracks it ON i.purchase_inquiry_id = it.inquiry_id
+    LEFT JOIN tracks t ON it.track_id = t.track_id
+    ${whereClause}
+    GROUP BY i.purchase_inquiry_id, c.customer_id
+    ORDER BY i.created_at DESC
+  `;
+
+  const result = await pool.query(sql, params);
+  return result.rows;
+};
+
+/**
+ * Admin: Get detailed inquiry info (including admin_note)
+ */
+export const getInquiryDetailAdmin = async (purchaseInquiryId) => {
+  const parsedInquiryId = parseInt(purchaseInquiryId, 10);
+  if (isNaN(parsedInquiryId)) {
+    return { notFound: true };
+  }
+
+  const inquiryRes = await pool.query(
+    `SELECT 
+       i.purchase_inquiry_id,
+       i.customer_id,
+       i.preferred_license_option_id,
+       i.usage_purpose,
+       i.usage_description,
+       i.budget,
+       i.currency,
+       i.message,
+       i.status,
+       i.admin_note,
+       i.created_at,
+       i.updated_at,
+       c.customer_name,
+       c.customer_email,
+       c.customer_phone,
+       c.company_name,
+       c.social_link,
+       c.note AS customer_note
+     FROM purchase_inquiries i
+     JOIN customers c ON i.customer_id = c.customer_id
+     WHERE i.purchase_inquiry_id = $1`,
+    [parsedInquiryId]
+  );
+
+  if (inquiryRes.rows.length === 0) {
+    return { notFound: true };
+  }
+
+  const inquiry = inquiryRes.rows[0];
+
+  const tracksRes = await pool.query(
+    `SELECT t.track_id, t.title, t.slug, t.cover_image_url, t.status AS track_status, t.allow_inquiry
+     FROM inquiry_tracks it
+     JOIN tracks t ON it.track_id = t.track_id
+     WHERE it.inquiry_id = $1`,
+    [parsedInquiryId]
+  );
+
+  return {
+    success: true,
+    inquiry: {
+      ...inquiry,
+      tracks: tracksRes.rows
+    }
+  };
+};
+
+/**
+ * Admin: Update status of a purchase inquiry
+ */
+export const updateInquiryStatus = async (purchaseInquiryId, status) => {
+  const parsedInquiryId = parseInt(purchaseInquiryId, 10);
+  if (isNaN(parsedInquiryId)) {
+    return { notFound: true };
+  }
+
+  if (!status || !VALID_INQUIRY_STATUSES.has(status)) {
+    return { invalidStatus: true, message: `Trạng thái không hợp lệ. Các giá trị được chấp nhận: ${[...VALID_INQUIRY_STATUSES].join(', ')}` };
+  }
+
+  const result = await pool.query(
+    `UPDATE purchase_inquiries
+     SET status = $1, updated_at = NOW()
+     WHERE purchase_inquiry_id = $2
+     RETURNING *`,
+    [status, parsedInquiryId]
+  );
+
+  if (result.rows.length === 0) {
+    return { notFound: true };
+  }
+
+  return {
+    success: true,
+    inquiry: result.rows[0]
+  };
+};
+
+/**
+ * Admin: Update admin note on a purchase inquiry
+ */
+export const updateInquiryNote = async (purchaseInquiryId, adminNote) => {
+  const parsedInquiryId = parseInt(purchaseInquiryId, 10);
+  if (isNaN(parsedInquiryId)) {
+    return { notFound: true };
+  }
+
+  const noteVal = adminNote !== undefined && adminNote !== null ? adminNote.trim() : null;
+
+  const result = await pool.query(
+    `UPDATE purchase_inquiries
+     SET admin_note = $1, updated_at = NOW()
+     WHERE purchase_inquiry_id = $2
+     RETURNING *`,
+    [noteVal, parsedInquiryId]
+  );
+
+  if (result.rows.length === 0) {
+    return { notFound: true };
+  }
+
+  return {
+    success: true,
+    inquiry: result.rows[0]
+  };
+};
