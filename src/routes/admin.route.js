@@ -30,6 +30,13 @@ import {
   putAudioFile,
   deleteAudioFile
 } from '../controllers/audioFile.controller.js';
+import {
+  getLicensePlans,
+  postLicensePlan,
+  putLicensePlan,
+  patchLicensePlanStatus,
+  deleteLicensePlan
+} from '../controllers/licensePlan.controller.js';
 
 const router = express.Router();
 
@@ -88,5 +95,14 @@ router.get('/tracks/:trackId/audio-files', verifyToken, allowedManagers, getAudi
 router.post('/tracks/:trackId/audio-files', verifyToken, allowedManagers, postAudioFile);
 router.put('/audio-files/:audioId', verifyToken, allowedManagers, putAudioFile);
 router.delete('/audio-files/:audioId', verifyToken, allowedManagers, deleteAudioFile);
+
+// ==========================================
+// GLOBAL LICENSE PLANS CRUD (Admin Only)
+// ==========================================
+router.get('/license-plans', verifyToken, allowedAdminOnly, getLicensePlans);
+router.post('/license-plans', verifyToken, allowedAdminOnly, postLicensePlan);
+router.put('/license-plans/:licenseId', verifyToken, allowedAdminOnly, putLicensePlan);
+router.patch('/license-plans/:licenseId/status', verifyToken, allowedAdminOnly, patchLicensePlanStatus);
+router.delete('/license-plans/:licenseId', verifyToken, allowedAdminOnly, deleteLicensePlan);
 
 export default router;
