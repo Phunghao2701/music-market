@@ -32,3 +32,21 @@ export const verifyToken = (req, res, next) => {
     });
   }
 };
+
+/**
+ * Middleware to restrict request access to specific user roles
+ * @param {...string} roles - Allowed roles
+ */
+export const requireRole = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      logger.warn(`[Auth]: Access forbidden for user ${req.user?.email || 'unknown'} (Role: ${req.user?.role || 'none'}). Required: ${roles.join(', ')}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền thực hiện hành động này.'
+      });
+    }
+    next();
+  };
+};
+

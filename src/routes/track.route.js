@@ -1,5 +1,6 @@
 import express from 'express';
 import { getTracks, getFeatured, getTrackDetails, getRelated } from '../controllers/track.controller.js';
+import { postPlayEvent } from '../controllers/play.controller.js';
 
 const router = express.Router();
 
@@ -160,4 +161,42 @@ router.get('/:slug', getTrackDetails);
  */
 router.get('/:trackId/related', getRelated);
 
+/**
+ * @swagger
+ * /tracks/{trackId}/play:
+ *   post:
+ *     summary: Ghi nhận một lượt nghe nhạc demo (public)
+ *     tags:
+ *       - Tracks
+ *     parameters:
+ *       - in: path
+ *         name: trackId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID của bài nhạc được nghe
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - played_seconds
+ *             properties:
+ *               played_seconds:
+ *                 type: integer
+ *                 description: Số giây đã nghe (không âm)
+ *                 example: 30
+ *     responses:
+ *       201:
+ *         description: Ghi nhận lượt nghe thành công
+ *       400:
+ *         description: Dữ liệu gửi lên không hợp lệ (ví dụ played_seconds bị âm)
+ *       404:
+ *         description: Không tìm thấy bài nhạc hoặc bài nhạc không công khai
+ */
+router.post('/:trackId/play', postPlayEvent);
+
 export default router;
+
