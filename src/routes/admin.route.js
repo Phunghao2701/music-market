@@ -50,6 +50,13 @@ import {
   patchInquiryStatus,
   patchInquiryNote
 } from '../controllers/inquiry.controller.js';
+import {
+  getPurchasesAdmin,
+  getPurchaseDetailAdmin,
+  postPurchaseAdmin,
+  patchPurchaseStatus,
+  patchPurchaseDelivery
+} from '../controllers/purchase.controller.js';
 
 const router = express.Router();
 
@@ -134,5 +141,14 @@ router.get('/inquiries', verifyToken, allowedAdminOnly, getInquiriesAdmin);
 router.get('/inquiries/:purchaseInquiryId', verifyToken, allowedAdminOnly, getInquiryDetailAdmin);
 router.patch('/inquiries/:purchaseInquiryId/status', verifyToken, allowedAdminOnly, patchInquiryStatus);
 router.patch('/inquiries/:purchaseInquiryId/note', verifyToken, allowedAdminOnly, patchInquiryNote);
+
+// ==========================================
+// ADMIN PURCHASES MANAGEMENT (Admin Only)
+// ==========================================
+router.get('/purchases', verifyToken, allowedAdminOnly, getPurchasesAdmin);
+router.post('/purchases', verifyToken, allowedAdminOnly, postPurchaseAdmin);
+router.get('/purchases/:purchaseId', verifyToken, allowedAdminOnly, getPurchaseDetailAdmin);
+router.patch('/purchases/:purchaseId/status', verifyToken, allowedAdminOnly, patchPurchaseStatus);
+router.patch('/purchases/:purchaseId/delivery', verifyToken, allowedAdminOnly, patchPurchaseDelivery);
 
 export default router;
